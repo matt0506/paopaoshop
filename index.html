@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>衣衣拍賣｜衣服拍賣網站</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,"Noto Sans TC",sans-serif;background:#f7f5f2;color:#292929}
+header{background:#fff;border-bottom:1px solid #ddd;position:sticky;top:0;z-index:5}
+.nav{max-width:1100px;margin:auto;padding:16px 20px;display:flex;align-items:center;justify-content:space-between}
+.logo{font-size:24px;font-weight:800}.logo span{font-size:14px;font-weight:400;color:#777;margin-left:6px}
+button{border:0;border-radius:10px;padding:11px 16px;font-weight:700;cursor:pointer}
+.sell{background:#222;color:#fff}.hero{max-width:1100px;margin:28px auto 10px;padding:25px 20px}
+.hero h1{font-size:38px;margin:0 0 8px}.hero p{color:#666}
+.grid{max-width:1100px;margin:auto;padding:10px 20px 50px;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px}
+.card{background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 4px 18px #0000000d}.photo{height:280px;background:#eee;display:flex;align-items:center;justify-content:center;font-size:80px}
+.info{padding:17px}.tag{font-size:12px;color:#777}.name{font-size:19px;font-weight:800;margin:5px 0}.price{font-size:22px;font-weight:800;margin:10px 0}.time{color:#b24b35;font-size:14px;margin-bottom:12px}
+.detail{display:none;max-width:850px;margin:30px auto;padding:20px}.back{background:#eee}.detailbox{background:#fff;border-radius:20px;padding:25px;margin-top:15px}.detailphoto{height:330px;background:#eee;border-radius:15px;display:flex;align-items:center;justify-content:center;font-size:110px}
+.detail h2{font-size:30px}.bidrow{display:flex;gap:10px}.bidrow input{flex:1;padding:12px;border:1px solid #ccc;border-radius:10px;font-size:16px}
+.modal{display:none;position:fixed;inset:0;background:#0008;z-index:10;align-items:center;justify-content:center;padding:20px}.modalbox{background:#fff;border-radius:18px;padding:25px;max-width:450px;width:100%}.modalbox input,.modalbox textarea{width:100%;padding:11px;margin:7px 0 12px;border:1px solid #ccc;border-radius:9px}.close{float:right;background:#eee}
+.notice{max-width:1100px;margin:0 auto;padding:0 20px;color:#777;font-size:13px}
+</style>
+</head>
+<body>
+<header><div class="nav"><div class="logo">衣衣拍賣<span>Clothes Auction</span></div><button class="sell" onclick="openSell()">＋ 我要賣衣服</button></div></header>
+
+<section class="hero" id="home">
+<h1>找到你的下一件衣服 👕</h1>
+<p>瀏覽拍賣中的衣服，也可以自己上架商品。</p>
+</section>
+
+<div class="notice">※ 這是第一版示範網站：商品與出價資料只會暫存在目前瀏覽器中，尚未連接真正的會員、付款與資料庫。</div>
+
+<section class="grid" id="products"></section>
+
+<section class="detail" id="detail">
+<button class="back" onclick="showHome()">← 回商品列表</button>
+<div class="detailbox">
+<div class="detailphoto" id="dphoto">👕</div>
+<h2 id="dname"></h2>
+<p id="ddesc"></p>
+<div class="tag" id="dsize"></div>
+<div class="price">目前最高出價：$<span id="dprice"></span></div>
+<div class="time" id="dtime"></div>
+<div class="bidrow">
+<input id="bidInput" type="number" min="1" placeholder="輸入你的出價">
+<button class="sell" onclick="placeBid()">出價</button>
+</div>
+</div>
+</section>
+
+<div class="modal" id="sellModal">
+<div class="modalbox">
+<button class="close" onclick="closeSell()">關閉</button>
+<h2>上架衣服</h2>
+<label>衣服名稱</label><input id="sname" placeholder="例如：白色連帽外套">
+<label>起標價格</label><input id="sprice" type="number" placeholder="例如：300">
+<label>尺寸</label><input id="ssize" placeholder="例如：M">
+<label>商品介紹</label><textarea id="sdesc" rows="4" placeholder="描述衣服狀況..."></textarea>
+<button class="sell" onclick="addProduct()">立即上架</button>
+</div></div>
+
+<script>
+const initial=[
+ {id:1,name:"簡約白色帽T",price:300,size:"M",desc:"簡約百搭的白色帽T，適合日常穿搭。",emoji:"🤍",end:Date.now()+1000*60*60*8},
+ {id:2,name:"復古牛仔外套",price:650,size:"L",desc:"經典牛仔外套，休閒風格。",emoji:"🧥",end:Date.now()+1000*60*60*16},
+ {id:3,name:"黑色寬鬆短袖",price:250,size:"S",desc:"簡單舒服的黑色短袖。",emoji:"🖤",end:Date.now()+1000*60*60*25}
+];
+let products=JSON.parse(localStorage.getItem("auctionProducts")||"null")||initial;
+let selected=null;
+
+function save(){localStorage.setItem("auctionProducts",JSON.stringify(products))}
+function money(n){return Number(n).toLocaleString()}
+function left(end){
+ let x=Math.max(0,end-Date.now()),h=Math.floor(x/3600000),m=Math.floor(x%3600000/60000),s=Math.floor(x%60000/1000);
+ return x<=0?"已結束":`${h} 小時 ${m} 分 ${s} 秒`;
+}
+function render(){
+ const box=document.getElementById("products");
+ box.innerHTML=products.map(p=>`
+ <article class="card">
+  <div class="photo">${p.emoji||"👕"}</div>
+  <div class="info">
+   <div class="tag">尺寸 ${p.size||"未提供"}</div>
+   <div class="name">${escapeHtml(p.name)}</div>
+   <div class="price">$${money(p.price)}</div>
+   <div class="time">⏰ ${left(p.end)}</div>
+   <button class="sell" onclick="showDetail(${p.id})">查看商品</button>
+  </div>
+ </article>`).join("");
+}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
+function showDetail(id){
+ selected=products.find(p=>p.id===id);
+ document.getElementById("home").style.display="none";
+ document.querySelector(".notice").style.display="none";
+ document.getElementById("products").style.display="none";
+ document.getElementById("detail").style.display="block";
+ document.getElementById("dphoto").textContent=selected.emoji||"👕";
+ document.getElementById("dname").textContent=selected.name;
+ document.getElementById("ddesc").textContent=selected.desc;
+ document.getElementById("dsize").textContent="尺寸："+(selected.size||"未提供");
+ document.getElementById("dprice").textContent=money(selected.price);
+ document.getElementById("bidInput").value="";
+ updateTime();
+}
+function updateTime(){
+ if(!selected)return;
+ document.getElementById("dtime").textContent="⏰ 剩餘時間："+left(selected.end);
+}
+function showHome(){
+ document.getElementById("home").style.display="block";
+ document.querySelector(".notice").style.display="block";
+ document.getElementById("products").style.display="grid";
+ document.getElementById("detail").style.display="none";
+ selected=null;render();
+}
+function placeBid(){
+ if(!selected)return;
+ const n=Number(document.getElementById("bidInput").value);
+ if(Date.now()>selected.end)return alert("這場拍賣已經結束！");
+ if(!n||n<=selected.price)return alert("出價必須高於目前價格！");
+ selected.price=n;save();
+ document.getElementById("dprice").textContent=money(n);
+ document.getElementById("bidInput").value="";
+ alert("出價成功！目前最高出價為 $"+money(n));
+}
+function openSell(){document.getElementById("sellModal").style.display="flex"}
+function closeSell(){document.getElementById("sellModal").style.display="none"}
+function addProduct(){
+ const name=document.getElementById("sname").value.trim(),price=Number(document.getElementById("sprice").value),size=document.getElementById("ssize").value.trim(),desc=document.getElementById("sdesc").value.trim();
+ if(!name||!price)return alert("請至少填寫衣服名稱和價格！");
+ products.unshift({id:Date.now(),name,price,size,desc:desc||"尚未提供商品介紹",emoji:"👚",end:Date.now()+1000*60*60*24});
+ save();closeSell();render();
+ ["sname","sprice","ssize","sdesc"].forEach(id=>document.getElementById(id).value="");
+ alert("商品已上架！");
+}
+render();setInterval(()=>{render();updateTime()},1000);
+</script>
+</body>
+</html>
